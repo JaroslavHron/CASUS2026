@@ -1,7 +1,7 @@
 from firedrake import *
 
 mesh = UnitSquareMesh(10, 10)
-V = FunctionSpace(mesh, "Lagrange", 1)
+V = FunctionSpace(mesh, "Lagrange", 2)
 
 x,y = SpatialCoordinate(mesh)
 

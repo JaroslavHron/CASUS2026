@@ -38,7 +38,7 @@ bce_down = fd.DirichletBC(W.sub(2), 1, [3])
 # Collect boundary conditions
 bcs = [bcv_wall, bce_top, bce_down]
 
-dt = 0.1
+dt = 0.01
 t_end = 30
 theta=Constant(1.0)   # Implicit Euler timestepping
 

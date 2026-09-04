@@ -19,7 +19,15 @@ dt = Constant(dt)
 t = Constant(0.0)
 
 # Create mesh and define function spaces
-mesh = RectangleMesh(80, 80, 1, 1) #, quadrilateral=True)
+#mesh = RectangleMesh(80, 80, 1, 1) #, quadrilateral=True)
+
+from netgen.meshing import MeshingStep
+
+shape = Sphere(Pnt(0,0,0), 1)
+#shape = Torus(p=(0, 0, 0), n=(0, 0, 1), R=1.0, r=0.3)
+ngmesh = OCCGeometry(shape).GenerateMesh(maxh=0.1, perfstepsend=MeshingStep.MESHSURFACE)
+mesh = Mesh(ngmesh, netgen_flags={"degree": 2})
+
 
 C = FunctionSpace(mesh, "CG", 1)
 M = FunctionSpace(mesh, "CG", 1)
@@ -59,7 +67,7 @@ c.rename("c")
 m.rename("m")
 
 # Create intial conditions and interpolate
-x, y = SpatialCoordinate(mesh)
+x, y, z = SpatialCoordinate(mesh)
 
 #pcg = PCG64(seed=42)
 #rg = Generator(pcg)
@@ -81,7 +89,7 @@ while (float(t) < T):
     
     c_tot = float(assemble(c*dx))
     print(f"{float(t)=:4e} {c_tot=:4e}")
-    #t.assign(t + dt)
+    t.assign(t + dt)
     vtk.write(c, m, time=float(t))
     
 
