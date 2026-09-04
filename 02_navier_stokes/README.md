@@ -19,15 +19,15 @@ B^T & 0
 
 solve the following nondimensional system:
 
-```math
+$$
 \begin{aligned}                                                                                                                     
-\frac{\partial \vec{v}}{\partial t} + ( \nabla \vec{v} ) \vec{v}                                                                   
--\operatorname{div}\left(\mathbf{T}\right) + \nabla p &= e \vec{g} \quad\text{ in }\Omega, \\
+\mathrm{\partial \vec{v}}{\partial t} + ( \nabla \vec{v} ) \vec{v}                                                                   
+-\mathrm{div}\left(\mathbf{T}\right) + \nabla p &= e \vec{g} \quad\text{ in }\Omega, \\
 \frac{\partial e}{\partial t} + \nabla e \cdot \vec{v}                                                                   
--\operatorname{div}\left(\frac{1}{\sqrt{\mathrm{Pr}\mathrm{Ra}}} \nabla e\right) + \mathbf{T}:\mathbf{D} &= 0 \quad\text{ in }\Omega, \\                                           
-\operatorname{div} \vec{v} &= 0 \quad\text{ in }\Omega, \\                                                                          
+-\mathrm{div}\left(\frac{1}{\sqrt{\mathrm{Pr}\mathrm{Ra}}} \nabla e\right) + \mathbf{T}:\mathbf{D} &= 0 \quad\text{ in }\Omega, \\                                           
+\mathrm{div} \vec{v} &= 0 \quad\text{ in }\Omega, \\                                                                          
 \end{aligned}
-```
+$$
 
 where $`\mathbf{D}=\frac12 (\nabla\vec{v} + \nabla\vec{v}^T)`$ and $`\mathbf{T}=\left(\frac{\mathrm{Pr}}{\mathrm{Ra}}\right)^{\frac12}\mathbf{D}`$ 
 
@@ -45,9 +45,9 @@ File `nse_solver.py` solves the nonstationary version of the equation on given m
 ```math
 \begin{aligned}                                                                                                                     
 \varrho \frac{\partial \vec{v}}{\partial t} + \varrho ( \nabla \vec{v} ) \vec{v}                                                                   
--\operatorname{div}\left(\mathbf{T}\right) + \nabla p &= \varrho \vec{g} \quad\text{ in }\Omega, \\
+-\mathrm{div}\left(\mathbf{T}\right) + \nabla p &= \varrho \vec{g} \quad\text{ in }\Omega, \\
 \frac{\partial \phi}{\partial t} + \nabla \phi \cdot \vec{v}  &= 0 \quad\text{ in }\Omega, \\                                           
-\operatorname{div} \vec{v} &= 0 \quad\text{ in }\Omega, \\                                                                          
+\mathrm{div} \vec{v} &= 0 \quad\text{ in }\Omega, \\                                                                          
 \end{aligned}
 ```
 
