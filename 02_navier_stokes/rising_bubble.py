@@ -105,7 +105,7 @@ def EQ(v,p,l,v_,p_,l_):
     return(F)
 
 n = fd.FacetNormal(mesh)
-I = fd.Identity(mesh.topological_dimension())
+I = fd.Identity(mesh.topological_dimension)
 h = fd.CellDiameter(mesh)
 
 

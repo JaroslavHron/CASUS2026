@@ -38,8 +38,8 @@ bce_down = fd.DirichletBC(W.sub(2), 1, [3])
 # Collect boundary conditions
 bcs = [bcv_wall, bce_top, bce_down]
 
-dt = 0.5
-t_end = 100
+dt = 0.1
+t_end = 30
 theta=Constant(1.0)   # Implicit Euler timestepping
 
 g=Constant([0.0, -1.0]) # nondimensional gravity vector
@@ -102,7 +102,7 @@ lu = {
     "snes_max_it": 40,
     "snes_rtol": 1e-10,
     "snes_atol": 1e-10,
-    "snes_linesearch_type": "basic",
+    "snes_linesearch_type": "bt",
     "ksp_type": "preonly",
     "pc_type": "lu",
     "pc_factor_mat_solver_type": "mumps"
