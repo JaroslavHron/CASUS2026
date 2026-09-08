@@ -1,22 +1,3 @@
-# Solving the Cahn-Hilliard Equation with Firedrake
-
-A practical tutorial on solving the **Cahn-Hilliard equation** using Firedrake and the Irksome time-stepping library.
-
-## Overview
-
-This tutorial demonstrates how to solve the Cahn-Hilliard equation, which models phase separation in binary fluid mixtures. The implementation uses a fully implicit time-stepping scheme and includes both a rectangular domain example and guidance for solving the equation on curved surfaces.
-
-## Contents
-
-- [Introduction](#introduction)
-- [Mathematical Formulation](#mathematical-formulation)
-- [Mixed Formulation](#mixed-formulation)
-- [Firedrake Implementation](#firedrake-implementation)
-- [Files in This Folder](#files-in-this-folder)
-- [Running the Code](#running-the-code)
-
-## Introduction
-
 The **Cahn-Hilliard equation** models the process of **phase separation** (spinodal decomposition) in a binary fluid mixture. It describes how two components naturally separate to form pure domains, driven by the minimization of a free-energy functional. This is a fourth-order nonlinear partial differential equation widely used in materials science and fluid dynamics.
 
 ## Mathematical Formulation
@@ -50,13 +31,10 @@ The parameter $\lambda$ controls the interfacial thickness and is a key tuning p
 
 To solve the fourth-order PDE using standard $C^0$ continuous finite elements, the equation is split into two coupled second-order equations:
 
-$$
-\frac{\partial c}{\partial t} - \nabla \cdot \left( M \nabla \mu \right) = 0
-$$
-
-$$
-\mu - \frac{df}{dc} + \lambda^2 \nabla^2 c = 0
-$$
+$$\begin{aligned}
+\frac{\partial c}{\partial t} - \nabla \cdot \left( M \nabla \mu \right) &= 0  \\
+\mu - \frac{df}{dc} + \lambda^2 \nabla^2 c &= 0
+\end{aligned}$$
 
 This mixed formulation is solved using a mixed function space with:
 - $c$ (concentration) in a standard Lagrange space
@@ -168,53 +146,3 @@ This file shows how to:
 
 **Note**: This is a template for extending the solver to curved domains. To use it with the main solver, adapt the mesh creation step.
 
-## Running the Code
-
-### On ROSI (with prepared environment)
-
-```bash
-source /home/tut10/hron/CASUS2026/setup.sh
-cd 01_cahn_hilliard
-srun -n 1 -u python 01_cahn_hilliard.py -lambda 0.02 -dt 0.01
-```
-
-### On Google Colab
-
-Use the setup instructions in the main `colab.txt` file, then:
-
-```python
-%cd 01_cahn_hilliard
-!python 01_cahn_hilliard.py -lambda 0.02 -dt 0.01
-```
-
-### Local Installation
-
-Refer to [Firedrake Installation](https://www.firedrakeproject.org/install.html).
-
-**Additional dependencies**:
-- **Irksome**: Time-stepping library `pip install irksome`
-- **Netgen**: Mesh generation (optional, for `sphere_surface.py`) `pip install netgen-mesher`
-
-## Key Concepts Learned
-
-- **Automatic differentiation** in UFL for computing chemical potential
-- **Mixed function spaces** for coupled systems of PDEs
-- **Implicit time stepping** with Irksome for improved stability
-- **Mesh generation** for 2D rectangular and 3D curved domains
-- **Diagnostic monitoring** during long time integrations
-- **Parametric studies** using PETSc command-line options
-
-## Physics Insights
-
-1. **Phase separation dynamics**: Initial perturbations grow and evolve into separated phases
-2. **Total mass conservation**: The sum $\int_\Omega c \, dx$ should remain constant (numerically verified)
-3. **Interfacial dynamics**: Parameter $\lambda$ controls the thickness of the interface between phases
-4. **Time-step selection**: Smaller $\Delta t$ is needed for finer interfaces (larger $\lambda$ requires smaller $dt$)
-
-## References
-
-- [Firedrake Project](https://www.firedrakeproject.org/)
-- [Irksome Documentation](https://irksome.readthedocs.io/)
-- [PETSc](https://petsc.org/)
-- [Netgen Mesher](https://github.com/NGSolve/netgen)
-- Cahn-Hilliard equation: Classic work on phase separation dynamics
