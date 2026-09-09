@@ -10,16 +10,18 @@ dt = opts.getReal('dt', 0.1)  # time step
 t_end  = opts.getReal('t_end', 20.0)  # end time
 
 # Time stepping library irksome
-from irksome import Dt, TimeStepper, BackwardEuler
+from irksome import Dt, TimeStepper, BackwardEuler, BDF, RadauIIA
 
-scheme = BackwardEuler()
+#scheme = BackwardEuler()
+#scheme = BDF(2)
+scheme = RadauIIA(2)
 
 dt = Constant(dt)
 t = Constant(0.0)
 
 # Create mesh and define function spaces
-n = 20
-mesh = RectangleMesh(n, 2*n, 1.0, 2.0)
+n = 40
+mesh = RectangleMesh(n, n, 1.0, 1.0)
 
 # inf-sup stable element - Taylor - Hood
 Ep = FiniteElement("CG", mesh.ufl_cell(), 1)
@@ -62,16 +64,15 @@ x, y = SpatialCoordinate(mesh)
 
 # Initial distance function (level-set)
 center = [0.5, 0.5]
-radius = 0.25
+radius = 0.2
 
-bubble1 = sqrt((x - 0.5)**2 + (y - 1.5)**2) - 0.25
-bubble2 = sqrt((x - 0.3)**2 + (y - 1.3)**2) - 0.20
-base = y - 0.5
+bubble = sqrt((x - center[0])**2 + (y - center[1])**2) - radius
+base = y - 0.2
 
 def min_func(a, b):
     return conditional(a < b, a, b)
 
-dist = min_func(base, min_func(bubble1, bubble2))
+dist = min_func(base, bubble)
 
 
 def Sign(q):
