@@ -6,7 +6,7 @@ print = PETSc.Sys.Print
 opts = PETSc.Options()
 
 # Model parameters
-dt_val = opts.getReal('dt', 0.1)  # time step
+dt = opts.getReal('dt', 0.1)  # time step
 t_end  = opts.getReal('t_end', 20.0)  # end time
 
 # Time stepping library irksome
@@ -14,7 +14,7 @@ from irksome import Dt, TimeStepper, BackwardEuler
 
 scheme = BackwardEuler()
 
-dt = Constant(dt_val)
+dt = Constant(dt)
 t = Constant(0.0)
 
 # Create mesh and define function spaces
@@ -68,10 +68,8 @@ bubble1 = sqrt((x - 0.5)**2 + (y - 1.5)**2) - 0.25
 bubble2 = sqrt((x - 0.3)**2 + (y - 1.3)**2) - 0.20
 base = y - 0.5
 
-
 def min_func(a, b):
     return conditional(a < b, a, b)
-
 
 dist = min_func(base, min_func(bubble1, bubble2))
 
@@ -104,11 +102,11 @@ n_facet = FacetNormal(mesh)
 T_stress = -p * I + nu(l) * (grad(v) + grad(v).T)
 
 # Level-set equation
-L_levelset = Dt(l) * l_ * dx + inner(grad(l) * v, l_) * dx
+L_levelset = Dt(l) * l_ * dx + inner(dot(grad(l),v), l_) * dx
 
 # Momentum equation (including Boussinesq buoyancy force for density variations)
 L_momentum = (
-    rho(l) * Dt(v) * v_ * dx
+    rho(l) * inner(Dt(v),  v_) * dx
     + rho(l) * inner(grad(v) * v, v_) * dx
     + inner(T_stress, grad(v_)) * dx
     - rho(l) * inner(g, v_) * dx
@@ -146,9 +144,14 @@ l.interpolate(dist)
 # Time stepping
 T = Constant(t_end)
 
+print(f"{stepper=}")
+print(f"{float(t)=:4e}")
+vtk.write(v, p, l, time=float(t))
+
 while float(t) < float(T):
     stepper.advance()
-
+    t.assign(t+dt)
+    
     print(f"{float(t)=:4e}")
     vtk.write(v, p, l, time=float(t))
 
