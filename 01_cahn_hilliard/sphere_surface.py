@@ -1,4 +1,6 @@
 
+import netgen
+from netgen.occ import *
 from netgen.meshing import MeshingStep
 
 shape = Sphere(Pnt(0,0,0), 1)
