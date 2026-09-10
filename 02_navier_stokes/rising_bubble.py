@@ -27,8 +27,12 @@ mesh = RectangleMesh(n, n, 1.0, 1.0)
 Ep = FiniteElement("CG", mesh.ufl_cell(), 1)
 Ev = VectorElement("CG", mesh.ufl_cell(), 2)
 El = FiniteElement("CG", mesh.ufl_cell(), 1)
-
 Evpl = MixedElement([Ev, Ep, El])
+
+#V = VectorFunctionSpace(mesh, "CG", k+1, variant="alfeld")
+#Q = FunctionSpace(mesh, "DG", k, variant="alfeld")
+
+
 W = FunctionSpace(mesh, Evpl)
 
 # Define test functions
@@ -54,7 +58,7 @@ mu1 = 1e1
 mu2 = 1e0
 
 # Surface tension
-st = Constant(1.0)
+st = Constant(1.0e2)
 
 # Mesh-dependent parameter for smooth sign function
 eps = CellDiameter(mesh)
@@ -67,7 +71,7 @@ center = [0.5, 0.5]
 radius = 0.2
 
 bubble = sqrt((x - center[0])**2 + (y - center[1])**2) - radius
-base = y - 0.2
+base = 0.1*x + 0.9*y - 0.2
 
 def min_func(a, b):
     return conditional(a < b, a, b)

@@ -12,9 +12,10 @@ Ra     = opts.getReal('Ra', 1e5)  # Rayleigh number
 Pr     = opts.getReal('Pr', 0.71)  # Prandtl number
 
 # Time stepping library irksome
-from irksome import Dt, TimeStepper, BackwardEuler, RadauIIA, BDF
+from irksome import Dt, TimeStepper, BackwardEuler, RadauIIA, BDF, ContinuousPetrovGalerkinScheme
 
 #scheme = BackwardEuler()
+#scheme = ContinuousPetrovGalerkinScheme(2)
 scheme = RadauIIA(2)
 #scheme = BDF(2)
 
@@ -27,13 +28,14 @@ t = Constant(0.0)
 n = 40
 mesh = UnitSquareMesh(n, n)
 
-# inf-sup stable element - Taylor - Hood
-Ep = FiniteElement("CG", mesh.ufl_cell(), 1)
-Ev = VectorElement("CG", mesh.ufl_cell(), 2)
-Ee = FiniteElement("CG", mesh.ufl_cell(), 2)
+k=1
+V = VectorFunctionSpace(mesh, "CG", k+1)
+P = FunctionSpace(mesh, "CG", k)
+#V = VectorFunctionSpace(mesh, "CG", k+1, variant="alfeld")
+#P = FunctionSpace(mesh, "DG", k, variant="alfeld")
+E = FunctionSpace(mesh, "CG", 1)
 
-Evpe = MixedElement([Ev, Ep, Ee])
-W = FunctionSpace(mesh, Evpe)
+W = MixedFunctionSpace([V,P,E])
 
 # Define test functions
 v_, p_, e_ = TestFunctions(W)
@@ -51,8 +53,8 @@ bce_down = DirichletBC(W.sub(2), 1.0, [3])
 bce_left = DirichletBC(W.sub(2), 1.0, [1])
 bce_right = DirichletBC(W.sub(2), 0.0, [2])
 
-#bcs = [bcv_wall, bce_top, bce_down]
-bcs = [bcv_wall, bce_left, bce_right]
+bcs = [bcv_wall, bce_top, bce_down]
+#bcs = [bcv_wall, bce_left, bce_right]
 
 # Spatial coordinates for initial condition
 x, y = SpatialCoordinate(mesh)
@@ -73,30 +75,25 @@ print(f"Re={1/np.sqrt(Pr/Ra)} T_diff={1/np.sqrt(Ra * Pr)}")
 # Energy equation: Dt(e) + grad(e)*v - div(K*grad(e)) + T:D = 0
 # Continuity: div(v) = 0
 
-L_momentum = (
-    inner(Dt(v), v_) * dx
+L1 = (
     + inner(dot(grad(v), v), v_) * dx
     + inner(T, grad(v_)) * dx
     + inner(e*g, v_) * dx
 )
 
-L_energy = (
-    inner(Dt(e), e_) * dx
+L2 = div(v) * p_ * dx
+
+L3 = (
     + inner(dot(grad(e),v), e_) * dx
     + inner(K * grad(e), grad(e_)) * dx
-    #- inner( inner(T, D), e_) * dx
+    - inner( inner(T, D), e_) * dx
 )
 
-L_continuity = div(v) * p_ * dx
 
-L = L_momentum + L_energy + L_continuity
-
-# Compute Jacobian
-J = derivative(L, w)
+F = inner(Dt(v), v_) * dx + L1 + L2 + inner(Dt(e), e_) * dx + L3
 
 nullsp = MixedVectorSpaceBasis(W, [W.sub(0), VectorSpaceBasis(constant=True, comm=mesh.comm), W.sub(2)])
-
-stepper = TimeStepper(L, scheme, t, dt, w, bcs=bcs, options_prefix="", nullspace=nullsp)
+stepper = TimeStepper(F, scheme, t, dt, w, bcs=bcs, options_prefix="", nullspace=nullsp)
 
 # Output file
 vtk = VTKFile("results/nse_cavity_vpe.pvd")
@@ -108,10 +105,14 @@ e.rename("e", "temperature")
 
 # Initial conditions (zero everywhere, boundary conditions will be applied)
 # Initialize temperature
-#e.interpolate(1-y)
-e.interpolate(1-x)
+e.interpolate(1-y + 0.01*x)
+#e.interpolate(1-x)
 
 # This is the default for Firedrake functions
+v0 = Function(v.function_space())
+v0.assign(v)
+e0 = Function(e.function_space())
+e0.assign(e)
 
 # Time stepping
 T = Constant(t_end)
@@ -122,6 +123,23 @@ vtk.write(v, p, e, time=float(t))
 while float(t) < float(T):
     stepper.advance()
     t.assign(t+dt)
+    print(stepper.solver_stats())
+
+    dvdt = assemble(L1)
+    for bc in bcs: bc.zero(dvdt)
+    dvdt = dvdt.riesz_representation()
+
+    ddvdt = (v-v0)/dt
+    print(f"{float(t)=:4e} {norm(dvdt)=}  {norm(ddvdt)=}")
+    v0.assign(v)
+
+    dedt = assemble(L3)
+    for bc in bcs: bc.zero(dedt)
+    dedt = dedt.riesz_representation()
+
+    ddedt = (e-e0)/dt
+    print(f"{float(t)=:4e} {norm(dedt)=}  {norm(ddedt)=}")
+    e0.assign(e)
+
     
-    print(f"{float(t)=:4e}")
     vtk.write(v, p, e, time=float(t))
