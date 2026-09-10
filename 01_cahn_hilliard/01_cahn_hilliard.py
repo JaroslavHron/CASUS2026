@@ -1,6 +1,8 @@
 from firedrake import *
 from firedrake import PETSc
 import numpy as np
+import netgen
+from netgen.occ import *
 
 print = PETSc.Sys.Print
 opts = PETSc.Options()
@@ -79,7 +81,7 @@ while (float(t) < T):
     
     c_tot = float(assemble(c*dx))
     print(f"{float(t)=:4e} {c_tot=:4e}")
-    t.assign(t + dt)
+    #t.assign(t + dt)
     vtk.write(c, m, time=float(t))
     
 

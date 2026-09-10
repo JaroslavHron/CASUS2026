@@ -1,148 +1,285 @@
-The **Cahn-Hilliard equation** models the process of **phase separation** (spinodal decomposition) in a binary fluid mixture. It describes how two components naturally separate to form pure domains, driven by the minimization of a free-energy functional. This is a fourth-order nonlinear partial differential equation widely used in materials science and fluid dynamics.
+# Solving the Cahn-Hilliard Equation with Firedrake
 
-## Mathematical Formulation
+A tutorial on solving the **Cahn-Hilliard equation** using the finite element package [Firedrake](https://www.firedrakeproject.org/).
 
-The Cahn-Hilliard equation is given by:
+> Converted to Markdown from the supplied presentation *Solving the Cahn-Hilliard Equation: A Tutorial using Firedrake* (September 3, 2026).
+
+## Contents
+
+- [Introduction](#introduction)
+- [Mathematical formulation](#mathematical-formulation)
+- [Mixed formulation](#mixed-formulation)
+- [Time discretization](#time-discretization-theta-method)
+- [Firedrake implementation](#firedrake-implementation)
+  - [Mesh and function spaces](#1-mesh-and-function-spaces)
+  - [Initial conditions](#2-initial-conditions)
+  - [Weak form](#3-weak-form)
+  - [Solving the nonlinear system](#4-solving-the-nonlinear-system)
+- [Complete example](#complete-example)
+- [Summary](#summary)
+
+## Introduction
+
+The **Cahn-Hilliard equation** models the process of phase separation, or **spinodal decomposition**, in a binary fluid mixture.
+
+It:
+
+- describes how two components separate to form pure domains,
+- is driven by minimization of a free-energy functional,
+- is a fourth-order nonlinear partial differential equation.
+
+## Mathematical formulation
+
+The standard Cahn-Hilliard equation is
 
 $$
-\frac{\partial c}{\partial t} = \nabla \cdot \left( M \nabla \mu \right)
+\frac{\partial c}{\partial t}
+= \nabla \cdot \left(M\nabla\mu\right),
 $$
 
-where:
-- $c$ is the concentration (order parameter)
-- $M$ is the mobility (scalar or tensor-valued)
-- $\mu$ is the chemical potential
+where
+
+- $c$ is the concentration, ranging approximately from $-1$ to $1$,
+- $M$ is the mobility,
+- $\mu$ is the chemical potential.
 
 The chemical potential is derived from the Ginzburg-Landau free energy:
 
 $$
-\mu = \frac{df}{dc} - \lambda^2 \nabla^2 c
+\mu = \frac{df}{dc} - \lambda \nabla^2 c,
 $$
 
-with the double-well potential:
+with the double-well potential
 
 $$
-f(c) = \frac{1}{4}(c^2 - 1)^2
+f(c) = \frac14(c^2-1)^2.
 $$
 
-The parameter $\lambda$ controls the interfacial thickness and is a key tuning parameter in the simulation.
+The parameter $\lambda$ is related to the interfacial thickness.
 
-## Mixed Formulation
+## Mixed formulation
 
-To solve the fourth-order PDE using standard $C^0$ continuous finite elements, the equation is split into two coupled second-order equations:
+To solve the fourth-order PDE in Firedrake using standard $C^0$ continuous finite elements, split it into two coupled second-order equations:
 
-$$\begin{aligned}
-\frac{\partial c}{\partial t} - \nabla \cdot \left( M \nabla \mu \right) &= 0  \\
-\mu - \frac{df}{dc} + \lambda^2 \nabla^2 c &= 0
-\end{aligned}$$
+$$
+\frac{\partial c}{\partial t}
+- \nabla\cdot(M\nabla\mu) = 0,
+$$
 
-This mixed formulation is solved using a mixed function space with:
-- $c$ (concentration) in a standard Lagrange space
-- $\mu$ (chemical potential) in a standard Lagrange space
+$$
+\mu - (c^3-c) + \lambda\nabla^2 c = 0.
+$$
 
-## Firedrake Implementation
+Seek
 
-### Key Components
+$$
+c,\mu \in V.
+$$
 
-#### 1. Mesh and Function Spaces
+Multiplying by test functions $v,q\in V$ and integrating by parts gives the weak formulation.
 
-```python
-mesh = RectangleMesh(80, 80, 1, 1)  # 80x80 structured mesh on unit square
+## Time discretization ($\theta$-method)
 
-C = FunctionSpace(mesh, "CG", 1)     # Continuous Galerkin, degree 1
-M = FunctionSpace(mesh, "CG", 1)     # Same for chemical potential
-W = MixedFunctionSpace([C, M])       # Mixed space for (c, mu)
-```
+Use a semi-implicit or fully implicit time-stepping scheme. Let $\Delta t$ denote the time step.
 
-#### 2. Initial Conditions
+The first equation becomes
 
-The code initializes concentration using a combination of cosine modes:
+$$
+\int_\Omega
+\left(
+\frac{c^{n+1}-c^n}{\Delta t}v
++ M\nabla\mu^{n+\theta}\cdot\nabla v
+\right)\,dx = 0,
+$$
 
-```python
-k = 2*pi
-c_init = 0.5 + 0.05*(cos(k*x)*cos(2*k*y) + cos(3*k*x)*cos(k*y) + cos(2*k*x+0.3))
-```
+and the second equation is
 
-This creates a smooth initial perturbation around $c = 0.5$ to trigger spinodal decomposition.
+$$
+\int_\Omega
+\left(
+\mu^{n+1}q
+- \left((c^{n+1})^3-c^{n+1}\right)q
+- \lambda\nabla c^{n+1}\cdot\nabla q
+\right)\,dx = 0.
+$$
 
-#### 3. Variational Formulation
+Here
 
-The weak form is expressed using Firedrake's Unified Form Language (UFL):
+$$
+\mu^{n+\theta}
+= (1-\theta)\mu^n + \theta\mu^{n+1}.
+$$
 
-```python
-c = variable(c)
-f = 0.25*(c**2 - 1)**2           # Free energy density
-dfdc = diff(f, c)                 # Automatic differentiation
+Special cases:
 
-L0 = Dt(c)*c_*dx + dot(grad(m), grad(c_))*dx
-L1 = m*m_*dx - dfdc*m_*dx - lmbda**2*dot(grad(c), grad(m_))*dx
-L = L0 + L1
-```
+- $\theta=0.5$: Crank-Nicolson,
+- $\theta=1$: Backward Euler.
 
-Where:
-- `Dt(c)` is the automatic time derivative (from Irksome)
-- `lmbda` is the interfacial parameter $\lambda$
+## Firedrake implementation
 
-#### 4. Time Stepping with Irksome
+### 1. Mesh and function spaces
 
-The tutorial uses the **Irksome** library for robust time integration:
-
-```python
-from irksome import Dt, TimeStepper, BackwardEuler
-
-scheme = BackwardEuler()  # Fully implicit time-stepping
-stepper = TimeStepper(L, scheme, t, dt, w, bcs=[], options_prefix="")
-
-# Time loop
-while float(t) < T:
-    stepper.advance()
-    c_tot = float(assemble(c*dx))  # Monitor total concentration
-    vtk.write(c, m, time=float(t))
-```
-
-### Time Integration Details
-
-- **Time-stepping scheme**: Backward Euler (first-order, fully implicit)
-- **Jacobian computation**: Automatic via `derivative(L, w)`
-- **Nonlinear solver**: PETSc SNES (Newton-Krylov method)
-- **Solver parameters**: Customizable via PETSc options
-
-## Files in This Folder
-
-### `01_cahn_hilliard.py` (Main solver)
-
-Solves the Cahn-Hilliard equation on a rectangular domain with the following features:
-
-- **Mesh**: $80 \times 80$ structured rectangular mesh on $[0,1]^2$
-- **Function spaces**: Mixed CG1-CG1 spaces for $(c, \mu)$
-- **Time stepping**: Backward Euler via Irksome
-- **Output**: VTK files for ParaView visualization
-- **Diagnostics**: Prints total concentration at each time step
-
-**Command-line parameters** (via PETSc options):
-- `-lambda`: Interfacial parameter (default: 0.02)
-- `-dt`: Time step size (default: 0.01)
-
-Example usage:
-```bash
-python 01_cahn_hilliard.py -lambda 0.01 -dt 0.005
-```
-
-### `sphere_surface.py` (Curved geometry)
-
-Demonstrates mesh generation for solving Cahn-Hilliard on curved surfaces:
+Create a two-dimensional unit-square mesh and a mixed function space for $c$ and $\mu$.
 
 ```python
-from netgen.occ import Sphere
-shape = Sphere(Pnt(0,0,0), 1)
-ngmesh = OCCGeometry(shape).GenerateMesh(maxh=0.1)
-mesh = Mesh(ngmesh, netgen_flags={"degree": 2})
+from firedrake import *
+
+# Create a 2D mesh
+mesh = UnitSquareMesh(96, 96)
+
+# Define the Function Space (Mixed for c and mu)
+V = FunctionSpace(mesh, "CG", 1)
+W = V * V
+
+# Define trial and test functions
+v, q = TestFunctions(W)
 ```
 
-This file shows how to:
-- Use Netgen/OCC geometry kernel for 3D surface meshes
-- Generate a unit sphere surface mesh
-- Create a degree-2 curved mesh for accurate geometry representation
+### 2. Initial conditions
 
-**Note**: This is a template for extending the solver to curved domains. To use it with the main solver, adapt the mesh creation step.
+Initialize the concentration using small random perturbations around a zero mean to trigger spinodal decomposition.
 
+```python
+import numpy as np
+
+# Define Functions for current and previous time steps
+u = Function(W)
+u0 = Function(W)
+
+# Split into c and mu to manipulate components
+c, mu = u.subfunctions
+c0, mu0 = u0.subfunctions
+
+# Initial condition: c = 0.0 + random noise
+c_init = 0.0 + 0.02 * (2 * np.random.rand(V.dim()) - 1)
+c.dat.data[:] = c_init
+u0.assign(u)
+```
+
+### 3. Weak form
+
+Use the **Unified Form Language (UFL)** to define the residual equations.
+
+```python
+dt = Constant(5e-6)
+lmbda = Constant(1e-2)
+theta = Constant(0.5)
+
+# Re-split for symbolic UFL formulation
+c, mu = split(u)
+c0, mu0 = split(u0)
+
+mu_mid = (1.0 - theta) * mu0 + theta * mu
+
+# Weak form equations
+F0 = c * v * dx - c0 * v * dx \
+     + dt * dot(grad(mu_mid), grad(v)) * dx
+
+F1 = mu * q * dx \
+     - (c**3 - c) * q * dx \
+     - lmbda * dot(grad(c), grad(q)) * dx
+
+F = F0 + F1
+```
+
+### 4. Solving the nonlinear system
+
+PETSc's **SNES** nonlinear solver is used at each time step.
+
+```python
+# Define the nonlinear variational problem
+prob = NonlinearVariationalProblem(F, u)
+
+solver = NonlinearVariationalSolver(
+    prob,
+    solver_parameters={
+        'snes_type': 'newtonls',
+        'ksp_type': 'preonly',
+        'pc_type': 'lu',
+    },
+)
+
+# Time stepping loop
+t = 0.0
+T = 0.001
+
+while t < T:
+    solver.solve()
+    u0.assign(u)
+    t += float(dt)
+```
+
+## Complete example
+
+The code fragments above can be combined into the following compact Firedrake program:
+
+```python
+from firedrake import *
+import numpy as np
+
+# Mesh and mixed function space
+mesh = UnitSquareMesh(96, 96)
+V = FunctionSpace(mesh, "CG", 1)
+W = V * V
+
+v, q = TestFunctions(W)
+
+# Current and previous solutions
+u = Function(W)
+u0 = Function(W)
+
+# Initial concentration
+c, mu = u.subfunctions
+c0, mu0 = u0.subfunctions
+
+c_init = 0.0 + 0.02 * (2 * np.random.rand(V.dim()) - 1)
+c.dat.data[:] = c_init
+u0.assign(u)
+
+# Parameters
+dt = Constant(5e-6)
+lmbda = Constant(1e-2)
+theta = Constant(0.5)
+
+# Symbolic split for UFL
+c, mu = split(u)
+c0, mu0 = split(u0)
+
+mu_mid = (1.0 - theta) * mu0 + theta * mu
+
+# Residual
+F0 = c * v * dx - c0 * v * dx \
+     + dt * dot(grad(mu_mid), grad(v)) * dx
+
+F1 = mu * q * dx \
+     - (c**3 - c) * q * dx \
+     - lmbda * dot(grad(c), grad(q)) * dx
+
+F = F0 + F1
+
+# Nonlinear solver
+prob = NonlinearVariationalProblem(F, u)
+solver = NonlinearVariationalSolver(
+    prob,
+    solver_parameters={
+        'snes_type': 'newtonls',
+        'ksp_type': 'preonly',
+        'pc_type': 'lu',
+    },
+)
+
+# Time integration
+t = 0.0
+T = 0.001
+
+while t < T:
+    solver.solve()
+    u0.assign(u)
+    t += float(dt)
+```
+
+## Summary
+
+- Firedrake allows a concise expression of the Cahn-Hilliard equation using UFL.
+- Splitting the fourth-order equation into a mixed system avoids the need for $C^1$ continuous elements or discontinuous Galerkin methods.
+- PETSc handles the resulting coupled nonlinear algebraic system.
