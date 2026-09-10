@@ -27,18 +27,17 @@ t = Constant(0.0)
 n = 40
 mesh = RectangleMesh(n, n, 1.0, 1.0)
 
-# inf-sup stable element - Taylor - Hood
-Ep = FiniteElement("CG", mesh.ufl_cell(), 1)
-Ev = VectorElement("CG", mesh.ufl_cell(), 2)
-Ec = FiniteElement("CG", mesh.ufl_cell(), 1)
-Em = FiniteElement("CG", mesh.ufl_cell(), 1)
+k = 1
+V = VectorFunctionSpace(mesh, "CG", k+1)
+P = FunctionSpace(mesh, "CG", k)
+C = FunctionSpace(mesh, "CG", k)
+M = FunctionSpace(mesh, "CG", k)
 
 # Alternative stable, pressure robust elements - Scott-Vogelius
-#Ep = FiniteElement("DG", mesh.ufl_cell(), 1, variant="alfeld")
-#Ev = VectorElement("CG", mesh.ufl_cell(), 2, variant="alfeld")
+#V = VectorFunctionSpace(mesh, "CG", k+1, variant="alfeld")
+#P = FunctionSpace(mesh, "DG", k, variant="alfeld")
 
-Evpcm = MixedElement([Ev, Ep, Ec, Em])
-W = FunctionSpace(mesh, Evpcm)
+W = MixedFunctionSpace([V, P, C, M])
 
 # Define test functions
 v_, p_, c_, m_ = TestFunctions(W)
@@ -148,6 +147,8 @@ m.rename("m", "chemical_potential")
 c.interpolate(c_init)
 
 # This is the default for Firedrake functions
+c0 = Function(c.function_space())
+c0.assign(c)
 
 # Time stepping
 T = Constant(t_end)
@@ -158,10 +159,18 @@ vtk.write(v, p, c, m, time=float(t))
 while float(t) < float(T):
     stepper.advance()
     t.assign(t+dt)
+    print(stepper.solver_stats())
     
     # Monitor bubble volume and mass
     V = assemble(conditional(c > 0.5, 1.0, 0.0) * dx)
     c_avg = assemble(c * dx)
     
-    print(f"{float(t)=:4e} volume={V:e} c_avg={c_avg:e}")
+    dcdt = assemble(L_ch0)
+    for bc in bcs: bc.zero(dcdt)
+    dcdt = dcdt.riesz_representation()
+    
+    ddcdt = (c-c0)/dt
+    print(f"{float(t)=:4e} volume={V:e} c_avg={c_avg:e} {norm(dcdt)=}  {norm(ddcdt)=}")
+    c0.assign(c)
+    
     vtk.write(v, p, c, m, time=float(t))
