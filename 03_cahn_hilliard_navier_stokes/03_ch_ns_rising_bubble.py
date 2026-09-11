@@ -6,7 +6,7 @@ print = PETSc.Sys.Print
 opts = PETSc.Options()
 
 # Model parameters
-dt_val = opts.getReal('dt', 0.1)      # time step
+dt = opts.getReal('dt', 0.1)      # time step
 t_end  = opts.getReal('t_end', 20.0)  # end time
 lmbda  = opts.getReal('lambda', 0.02) # interface parameter
 M_mob  = opts.getReal('M', 1.0)       # mobility
@@ -15,12 +15,11 @@ M_mob  = opts.getReal('M', 1.0)       # mobility
 from irksome import Dt, TimeStepper, BackwardEuler, RadauIIA, BDF
 
 #scheme = BackwardEuler()
+#scheme = ContinuousPetrovGalerkinScheme(2)
 scheme = RadauIIA(2)
 #scheme = BDF(2)
 
-print(f"{scheme.__dict__=}")
-
-dt = Constant(dt_val)
+dt = Constant(dt)
 t = Constant(0.0)
 
 # Create mesh and define function spaces
@@ -28,14 +27,14 @@ n = 40
 mesh = RectangleMesh(n, n, 1.0, 1.0)
 
 k = 1
-V = VectorFunctionSpace(mesh, "CG", k+1)
-P = FunctionSpace(mesh, "CG", k)
+#V = VectorFunctionSpace(mesh, "CG", k+1)
+#P = FunctionSpace(mesh, "CG", k)
 C = FunctionSpace(mesh, "CG", k)
 M = FunctionSpace(mesh, "CG", k)
 
 # Alternative stable, pressure robust elements - Scott-Vogelius
-#V = VectorFunctionSpace(mesh, "CG", k+1, variant="alfeld")
-#P = FunctionSpace(mesh, "DG", k, variant="alfeld")
+V = VectorFunctionSpace(mesh, "CG", k+1, variant="alfeld")
+P = FunctionSpace(mesh, "DG", k, variant="alfeld")
 
 W = MixedFunctionSpace([V, P, C, M])
 
@@ -50,7 +49,6 @@ v, p, c, m = split(w)
 
 # Boundary conditions
 bcv_wall = DirichletBC(W.sub(0), as_vector([0, 0]), [1, 2, 3, 4])
-
 bcs = [bcv_wall]
 
 # Spatial coordinates for initial condition
@@ -75,11 +73,12 @@ def mu_c(c_val):
 
 # Cahn-Hilliard chemical potential
 c_var = variable(c)
-f = 0.25 * (c_var**2 - 1)**2
+#f = 0.25 * (c_var**2 - 1)**2
+f = c_var**2 * (1 - c_var**2)
 dfdc = diff(f, c_var)
 
 # Mesh-dependent parameter
-eps = CellDiameter(mesh)
+eps = 2.0*CellDiameter(mesh)
 
 # Initial level-set configuration
 center = [0.5, 0.5]
@@ -93,15 +92,20 @@ def min_func(a, b):
 
 dist = min_func(base, bubble)
 
-def Sign(q):
-    return q / sqrt(q * q + eps * eps)
+def Sign(q, eps):
+    #return q / sqrt(q * q + eps * eps)
+    return tanh(3.8 * q / eps)
+    #condlist   = [q < -eps, (q >= -eps) & (q <= eps), q > eps]
+    #choicelist = [ -1.0, q / eps, 1.0]
+    #choicelist = [ -1.0, q / eps + np.sin(np.pi * q / eps) / np.pi), 1.0]
+    return np.select(condlist, choicelist)
 
-c_init = 0.5 * (1.0 - Sign(dist))
+c_init = 0.5 * (1.0 - Sign(dist, eps))
 
 # Strain rate and stress tensor
 I = Identity(mesh.topological_dimension)
 D = sym(grad(v))
-T = 2 * mu_c(c) * D
+T = -p * I + 2 * mu_c(c) * D
 
 # Capillary force
 f_cap = sigma * grad(c)
@@ -128,7 +132,7 @@ L_ch0 = Dt(c) * c_ * dx + inner(dot(grad(c), v), c_) * dx + M_mob * inner(grad(m
 
 L_ch1 = m * m_ * dx - dfdc * m_ * dx - lmbda**2 * inner(grad(c), grad(m_)) * dx
 
-F = rho_c(c) * inner(Dt(v), v_) * dx + L_momentum + L_continuity + L_ch0 + L_ch1
+F = inner(rho_c(c) * Dt(v), v_) * dx + L_momentum + L_continuity + L_ch0 + L_ch1
 
 nullsp = MixedVectorSpaceBasis(W, [W.sub(0), VectorSpaceBasis(constant=True, comm=mesh.comm), W.sub(2), W.sub(3)])
 stepper = TimeStepper(F, scheme, t, dt, w, bcs=bcs, options_prefix="", nullspace=nullsp)
@@ -165,12 +169,12 @@ while float(t) < float(T):
     V = assemble(conditional(c > 0.5, 1.0, 0.0) * dx)
     c_avg = assemble(c * dx)
     
-    dcdt = assemble(L_ch0)
-    for bc in bcs: bc.zero(dcdt)
-    dcdt = dcdt.riesz_representation()
+    #dcdt = assemble(L_ch0)
+    #for bc in bcs: bc.zero(dcdt)
+    #dcdt = dcdt.riesz_representation()
     
-    ddcdt = (c-c0)/dt
-    print(f"{float(t)=:4e} volume={V:e} c_avg={c_avg:e} {norm(dcdt)=}  {norm(ddcdt)=}")
+    #ddcdt = (c-c0)/dt
+    #print(f"{float(t)=:4e} volume={V:e} c_avg={c_avg:e} {norm(dcdt)=}  {norm(ddcdt)=}")
     c0.assign(c)
     
     vtk.write(v, p, c, m, time=float(t))

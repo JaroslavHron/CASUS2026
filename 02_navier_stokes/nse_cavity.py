@@ -6,7 +6,7 @@ print = PETSc.Sys.Print
 opts = PETSc.Options()
 
 # Model parameters
-dt_val = opts.getReal('dt', 0.1)  # time step
+dt = opts.getReal('dt', 0.1)  # time step
 t_end  = opts.getReal('t_end', 50.0)  # end time
 Ra     = opts.getReal('Ra', 1e5)  # Rayleigh number
 Pr     = opts.getReal('Pr', 0.71)  # Prandtl number
@@ -19,9 +19,7 @@ from irksome import Dt, TimeStepper, BackwardEuler, RadauIIA, BDF, ContinuousPet
 scheme = RadauIIA(2)
 #scheme = BDF(2)
 
-print(f"{scheme.__dict__=}")
-
-dt = Constant(dt_val)
+dt = Constant(dt)
 t = Constant(0.0)
 
 # Create mesh and define function spaces
